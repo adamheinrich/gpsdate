@@ -94,16 +94,16 @@ int open_port(char *port_name, int baudrate) {
 void message_complete(int argc, char argv[][32]) {
 
     if (argc == 14 && strcmp(argv[0], "GPRMC") == 0) {
-        int hours, minutes, seconds, ss;
+        int hours, minutes, seconds;
         int day, month, year;
 
         /* Parse UTC time */
-        sscanf(argv[1], "%02d%02d%02d.%02d", &hours, &minutes, &seconds, &ss);
+        sscanf(argv[1], "%02d%02d%02d", &hours, &minutes, &seconds);
         sscanf(argv[9], "%02d%02d%02d", &day, &month, &year);
         year += 2000;
 
         if (day > 0 && day <= 31 && month > 0 && month <= 12 && year >= 2000) {
-            if (hours >= 0 && hours < 24 && minutes >= 0 && minutes <= 60 && seconds >= 0 && seconds <= 60 && ss >= 0 && ss <= 100) {
+            if (hours >= 0 && hours < 24 && minutes >= 0 && minutes <= 60 && seconds >= 0 && seconds <= 60) {
 
                 time_t curr_time;
                 struct tm *timeinfo;
