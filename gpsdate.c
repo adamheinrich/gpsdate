@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
     int baudrate = 9600;
 
     /* Handle -options */
-    char c;
+    int c;
     while ((c = getopt(argc, argv, "hb:d:")) != -1) {
         switch (c) {
             case 'b':
