@@ -235,7 +235,7 @@ int main(int argc, char** argv) {
         }
 
         time(&curr_time);
-        if (delay != -1 && (curr_time - first_time) >= delay) {
+        if (read_gps && delay != -1 && (curr_time - first_time) >= delay) {
             printf("No valid time information from GPS in last %d seconds.\n", delay);
             read_gps = 0;
         }
