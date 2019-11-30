@@ -80,6 +80,11 @@ static int open_port(char *port_name, int baudrate)
 static void message_complete(int argc, char argv[][32])
 {
 	if ((argc == 13 || argc == 14) && strcmp(argv[0], "GPRMC") == 0) {
+
+		/* Only parse time when there is a fix: */
+		if (strcmp(argv[2], "A") != 0)
+			return;
+
 		int hours, minutes, seconds;
 		int day, month, year;
 

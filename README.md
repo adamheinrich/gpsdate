@@ -1,6 +1,6 @@
 # gpsdate
 
-Simple tool for fetching date and time from GPS receiver and saving it as a local time on Linux system. Waits specified time until valid $GPRMC NMEA sentence is received. If no valid time information is received (i.e. the signal is poor), the local time remains unchanged.
+Simple tool for fetching date and time from GPS receiver and saving it as a local time on Linux system. Waits specified time until valid $GPRMC NMEA sentence is received. If the GPS receiver is not fixed and no valid time information is received, the local time remains unchanged.
 
 # Fetch
 
