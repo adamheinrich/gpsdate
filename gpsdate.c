@@ -118,12 +118,12 @@ static void message_complete(int argc, char argv[][32])
 			/* Add number of seconds from UTC: */
 			gps_time += timeinfo->tm_gmtoff;
 
-			/* Set system time, may need root privilegies: */
+			/* Set system time, may need root privileges: */
 			if (stime(&gps_time) == 0) {
-				printf("Succesfully updated local time.\n");
+				printf("Successfully updated local time.\n");
 			} else {
 				fprintf(stderr, "Local time can't be updated. "
-					"Do you have root privilegies?\n");
+					"Do you have root privileges?\n");
 			}
 
 			read_gps = 0;
@@ -156,7 +156,7 @@ int main(int argc, char** argv)
 				printf("Usage: %s [-b <BAUDRATE>] [-d <DELAY>] PORT\n", argv[0]);
 				printf("Saves time from a GPS receiver connected to PORT as local time.\n");
 				printf("Waits specified time until valid $GPRMC NMEA sentence is received. If no valid time information is received (i.e. the signal is poor), the local time remains unchanged.\n");
-				printf("This program has to be run with root privilegies in order to configure local time.\n");
+				printf("This program has to be run with root privileges in order to configure local time.\n");
 				printf("\n");
 				printf("  -b BAUDRATE  Sets specified baudrate. Only limited baudrate set {2400, 4800, ..., 230400} is supported (Default %d bd).\n", baudrate);
 				printf("  -d DELAY     Sets the maximum time in seconds or -1 for infinite loop (Default %d s).\n", delay);
