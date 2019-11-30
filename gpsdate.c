@@ -29,7 +29,7 @@
 
 #include "nmea.h"
 
-int read_gps;
+volatile int read_gps;
 
 int baudrate_constant(int baudrate)
 {
