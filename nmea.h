@@ -21,14 +21,16 @@
 #define	NMEA_H
 
 /**
- * Parses bytes from GPS receiver and fires listener action when the NMEA sentence is complete and has valid checksum.
+ * Parses bytes from GPS receiver and fires listener action when the NMEA
+ * sentence is complete and has valid checksum.
+ *
  * The buffer size is arbitrary.
- * 
- * @param numbytes Number of bytes read in buffer
- * @param buffer Buffer of incoming bytes
- * @param listener Function to be fired after the sentence is parsed
+ *
+ * @param numbytes	Number of bytes read in buffer
+ * @param buffer	Buffer of incoming bytes
+ * @param listener	Function to be fired after the sentence is parsed
  */
-void nmea_parse(int numbytes, char *buffer, void (*listener)(int argc, char argv[][32]));
+void nmea_parse(int numbytes, char *buffer,
+		void (*listener)(int argc, char argv[][32]));
 
 #endif	/* NMEA_H */
-
