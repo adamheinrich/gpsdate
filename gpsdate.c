@@ -29,14 +29,8 @@
 
 #include "nmea.h"
 
-/** Main loop condition */
 int read_gps;
 
-/**
- * Convert baudrate to constant for cfsetispeed and cfsetospeed functions.
- * @param baudrate Requested baudrate (i.e. 9600)
- * @return Baudrate constant (i.e. B9600) or -1 for invalid baudrate
- */
 int baudrate_constant(int baudrate)
 {
 	switch (baudrate) {
@@ -83,14 +77,6 @@ int open_port(char *port_name, int baudrate)
 	return fd;
 }
 
-/**
- * Listener for the nmea_parse function.
- *
- * Parses time from GPRMC sentence and quits the main loop.
- *
- * @param argc	NMEA sentence arguments count
- * @param argv	NMEA sentence arguments
- */
 void message_complete(int argc, char argv[][32])
 {
 	if (argc == 14 && strcmp(argv[0], "GPRMC") == 0) {
@@ -162,12 +148,11 @@ static void catch_signals()
 
 int main(int argc, char** argv)
 {
-	/* Parameters (can be set using -options): */
 	char* port_name = NULL;
 	int delay = 10;
 	int baudrate = 9600;
 
-	/* Handle -options: */
+	/* Handle options: */
 	int c;
 	while ((c = getopt(argc, argv, "hb:d:")) != -1) {
 		switch (c) {
@@ -203,7 +188,7 @@ int main(int argc, char** argv)
 		}
 	}
 
-	/* Save port name: */
+	/* Check for port name: */
 	if (optind < argc) {
 		port_name = argv[optind];
 	} else {
@@ -224,7 +209,6 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	/* Real gentlemen clean up after finishing the job! */
 	catch_signals();
 
 	int nread;
