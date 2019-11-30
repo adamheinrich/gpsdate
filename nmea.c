@@ -24,16 +24,16 @@
 /* NMEA message argument values (array of strings). Argument 0 is the sentence
    name (typically GPxxx), the last argument is message checksum (hexadecimal
    number behind '*') */
-char argv[32][32];
+static char argv[32][32];
 
 /* NMEA message argument count (incl. NMEA sentence name and checksum) */
-int argc = 0;
+static int argc = 0;
 
-int checksum = 0;
-int calcchecksum = 0;
-int argvbyte = 0;
+static int checksum = 0;
+static int calcchecksum = 0;
+static int argvbyte = 0;
 
-void clear()
+static void clear(void)
 {
 	checksum = 0;
 	argc = 0;

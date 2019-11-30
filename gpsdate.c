@@ -29,9 +29,9 @@
 
 #include "nmea.h"
 
-volatile int read_gps;
+static volatile int read_gps;
 
-int baudrate_constant(int baudrate)
+static int baudrate_constant(int baudrate)
 {
 	switch (baudrate) {
 		case 2400:
@@ -55,7 +55,7 @@ int baudrate_constant(int baudrate)
 	}
 }
 
-int open_port(char *port_name, int baudrate)
+static int open_port(char *port_name, int baudrate)
 {
 	int fd;
 
@@ -77,7 +77,7 @@ int open_port(char *port_name, int baudrate)
 	return fd;
 }
 
-void message_complete(int argc, char argv[][32])
+static void message_complete(int argc, char argv[][32])
 {
 	if (argc == 14 && strcmp(argv[0], "GPRMC") == 0) {
 		int hours, minutes, seconds;
@@ -131,12 +131,12 @@ void message_complete(int argc, char argv[][32])
 	}
 }
 
-void signal_handler(int signal_value)
+static void signal_handler(int signal_value)
 {
 	read_gps = 0;
 }
 
-static void catch_signals()
+static void catch_signals(void)
 {
 	struct sigaction action;
 	action.sa_handler = signal_handler;
