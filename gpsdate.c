@@ -26,10 +26,11 @@
 #include <fcntl.h>
 #include <time.h>
 #include <unistd.h>
-
+#include <stdbool.h>
 #include "nmea.h"
 
 static volatile int read_gps;
+static bool date_changed;
 
 static int baudrate_constant(int baudrate)
 {
@@ -126,6 +127,7 @@ static void message_complete(int argc, char argv[][32])
 			/* Set system time, may need root privileges: */
 			if (stime(&gps_time) == 0) {
 				printf("Successfully updated local time.\n");
+				date_changed = true;
 			} else {
 				fprintf(stderr, "Local time can't be updated. "
 					"Do you have root privileges?\n");
@@ -230,5 +232,5 @@ int main(int argc, char** argv)
 
 	close(fd);
 
-	return 0;
+	return date_changed ? 0 : 1;
 }
