@@ -112,12 +112,12 @@ void message_complete(int argc, char argv[][32]) {
                 time(&curr_time);
                 timeinfo = localtime(&curr_time);
 
-                printf("Local datetime was: %04d-%02d-%02d %02d:%02d:%02d (%s)\n", timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday + 1, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, timeinfo->tm_zone);
+                printf("Local datetime was: %04d-%02d-%02d %02d:%02d:%02d (%s)\n", timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, timeinfo->tm_zone);
                 printf("GPS   datetime  is: %04d-%02d-%02d %02d:%02d:%02d (UTC)\n", year, month, day, hours, minutes, seconds);
 
                 timeinfo->tm_year = year - 1900;
                 timeinfo->tm_mon = month - 1;
-                timeinfo->tm_mday = day - 1;
+                timeinfo->tm_mday = day;
                 timeinfo->tm_hour = hours;
                 timeinfo->tm_min = minutes;
                 timeinfo->tm_sec = seconds;
