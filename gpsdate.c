@@ -131,19 +131,9 @@ static void message_complete(int argc, char argv[][32])
 	}
 }
 
-static void signal_handler(int signal_value)
+static void signal_handler(int signo)
 {
 	read_gps = 0;
-}
-
-static void catch_signals(void)
-{
-	struct sigaction action;
-	action.sa_handler = signal_handler;
-	action.sa_flags = 0;
-	sigemptyset(&action.sa_mask);
-	sigaction(SIGINT, &action, NULL);
-	sigaction(SIGTERM, &action, NULL);
 }
 
 int main(int argc, char** argv)
@@ -209,7 +199,8 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	catch_signals();
+	signal(SIGINT, &signal_handler);
+	signal(SIGTERM, &signal_handler);
 
 	int nread;
 	char buffer[32];
