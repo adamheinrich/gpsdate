@@ -1,21 +1,19 @@
-# The final executable name
-EXECUTABLE=gpsdate
+BIN = gpsdate
 
-# List of source files
-SOURCES=gpsdate.c nmea.c
+OBJS = $(patsubst %.c, %.o, $(wildcard *.c))
 
-CC=gcc
-CFLAGS=-c -Wall
-LDFLAGS=
-OBJECTS=$(SOURCES:.c=.o)
+CFLAGS = -O3 -Wall -pedantic -Wconversion -Wcast-align
+LDFLAGS = $(CFLAGS)
 
-all: $(SOURCES) $(EXECUTABLE)
-	
-$(EXECUTABLE): $(OBJECTS) 
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+.PHONY: all
+all: $(BIN)
 
-.c.o:
-	$(CC) $(CFLAGS) $< -o $@
+$(BIN): $(OBJS)
+	$(CC) $^ $(LDFLAGS) -o $@
 
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+.PHONY: clean
 clean:
-	rm -rf *o $(EXECUTABLE)
+	rm -f $(OBJS) $(BIN)
