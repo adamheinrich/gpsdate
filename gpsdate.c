@@ -17,220 +17,179 @@
  * along with gpsdate.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <signal.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdbool.h>
+#include <signal.h>
 #include <string.h>
-#include <termios.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <time.h>
 #include <unistd.h>
-#include <stdbool.h>
 #include "nmea.h"
+#include "serial_port.h"
 
-static volatile int read_gps;
+#define DEFAULT_BAUDRATE	9600
+#define DEFAULT_TIMEOUT		10
+
+#define TIME_FMT		"%04d-%02d-%02d %02d:%02d:%02d"
+
+static volatile bool read_gps = true;
 static bool date_changed;
 
-static int baudrate_constant(int baudrate)
-{
-	switch (baudrate) {
-		case 2400:
-			return B2400;
-		case 4800:
-			return B4800;
-		case 9600:
-			return B9600;
-		case 19200:
-			return B19200;
-		case 38400:
-			return B38400;
-		case 57600:
-			return B57600;
-		case 115200:
-			return B115200;
-		case 230400:
-			return B230400;
-		default:
-			return -1;
-	}
-}
+static const char *help_text =
+"Sets time from a GPS receiver connected to a serial port as a local time.\n\n"
+"Options:\n"
+"  -b <baudrate>    Sets baud rate. Only a limited set of baud rates {2400,\n"
+"                   4800, ..., 230400} is supported (Default %d baud).\n"
+"  -t,-d <timeout>  Sets the maximum timeout in seconds or 0 for no timeout\n"
+"                   (Default %d seconds)\n"
+"  -h               Displays this help.\n";
 
-static int open_port(char *port_name, int baudrate)
+static void print_help(bool full_help, const char *program_name)
 {
-	int fd;
-
-	fd = open(port_name, O_RDWR | O_NOCTTY | O_NDELAY);
-	if (fd == -1) {
-		perror("open_port: Unable to open: ");
+	if (full_help) {
+		printf("Usage: %s [options] port\n", program_name);
+		printf(help_text, DEFAULT_BAUDRATE, DEFAULT_TIMEOUT);
 	} else {
-		fcntl(fd, F_SETFL, 0);
+		fprintf(stderr, "Usage: %s [-bt] port\n", program_name);
+		fprintf(stderr, "Run `%s -h` for help.\n", program_name);
 	}
-
-	struct termios options;
-	tcgetattr(fd, &options);
-
-	cfsetispeed(&options, baudrate_constant(baudrate));
-	cfsetospeed(&options, baudrate_constant(baudrate));
-
-	tcsetattr(fd, TCSANOW, &options);
-
-	return fd;
 }
 
-static void message_complete(int argc, char argv[][32])
+static void process_message(const char *msgid, const char **data)
 {
-	if ((argc == 13 || argc == 14) && strcmp(argv[0], "GPRMC") == 0) {
+	size_t length = 0;
+	while (data[length])
+		length++;
+
+	if (strcmp(msgid, "GPRMC") == 0 && (length == 11 || length == 12)) {
 
 		/* Only parse time when there is a fix: */
-		if (strcmp(argv[2], "A") != 0)
+		if (strcmp(data[1], "A") != 0)
 			return;
 
-		int hours, minutes, seconds;
-		int day, month, year;
+		/* Parse UTC time: */
+		int day, month, year, hours, minutes, seconds;
+		const char *tfmt = "%02d%02d%02d";
 
-		/* Parse UTC time */
-		sscanf(argv[1], "%02d%02d%02d", &hours, &minutes, &seconds);
-		sscanf(argv[9], "%02d%02d%02d", &day, &month, &year);
+		if (sscanf(data[0], tfmt, &hours, &minutes, &seconds) != 3)
+			return;
+
+		if (sscanf(data[8], tfmt, &day, &month, &year) != 3)
+			return;
+
 		year += 2000;
 
-		if ((day > 0 && day <= 31) &&
-		    (month > 0 && month <= 12) &&
+		if ((day >= 1 && day <= 31) &&
+		    (month >= 1 && month <= 12) &&
 		    (year >= 2000) &&
-		    (hours >= 0 && hours < 24) &&
-		    (minutes >= 0 && minutes <= 60) &&
-		    (seconds >= 0 && seconds <= 60)) {
-
-			time_t curr_time;
-			struct tm *timeinfo;
+		    (hours >= 0 && hours <= 23) &&
+		    (minutes >= 0 && minutes <= 59) &&
+		    (seconds >= 0 && seconds <= 59)) {
 
 			/* Get current time, print it and modify: */
+			time_t curr_time;
 			time(&curr_time);
-			timeinfo = localtime(&curr_time);
+			struct tm *t = localtime(&curr_time);
 
-			printf("Local datetime was: %04d-%02d-%02d %02d:%02d:%02d (%s)\n", timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, timeinfo->tm_zone);
-			printf("GPS   datetime  is: %04d-%02d-%02d %02d:%02d:%02d (UTC)\n", year, month, day, hours, minutes, seconds);
+			printf("Local time was: " TIME_FMT " (%s)\n",
+			       (t->tm_year + 1900), (t->tm_mon + 1), t->tm_mday,
+			       t->tm_hour, t->tm_min, t->tm_sec, t->tm_zone);
+			printf("GPS   time  is: " TIME_FMT " (UTC)\n",
+			       year, month, day, hours, minutes, seconds);
 
-			timeinfo->tm_year = year - 1900;
-			timeinfo->tm_mon = month - 1;
-			timeinfo->tm_mday = day;
-			timeinfo->tm_hour = hours;
-			timeinfo->tm_min = minutes;
-			timeinfo->tm_sec = seconds;
+			t->tm_year = year - 1900;
+			t->tm_mon = month - 1;
+			t->tm_mday = day;
+			t->tm_hour = hours;
+			t->tm_min = minutes;
+			t->tm_sec = seconds;
 
-			/* Calculate number of seconds since some old date: */
-			time_t gps_time = mktime(timeinfo);
+			/* Set new system time: */
+			time_t gps_time = mktime(t);
+			gps_time += t->tm_gmtoff;
 
-			/* Add number of seconds from UTC: */
-			gps_time += timeinfo->tm_gmtoff;
-
-			/* Set system time, may need root privileges: */
 			if (stime(&gps_time) == 0) {
 				printf("Successfully updated local time.\n");
 				date_changed = true;
 			} else {
-				fprintf(stderr, "Local time can't be updated. "
+				fprintf(stderr, "Couldn't set local time. "
 					"Do you have root privileges?\n");
 			}
 
-			read_gps = 0;
+			read_gps = false;
 		}
 	}
 }
 
 static void signal_handler(int signo)
 {
-	read_gps = 0;
+	read_gps = false;
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-	char* port_name = NULL;
-	int delay = 10;
-	int baudrate = 9600;
+	const char *port_name = NULL;
+	int timeout = DEFAULT_TIMEOUT;
+	int baudrate = DEFAULT_BAUDRATE;
 
 	/* Handle options: */
 	int c;
-	while ((c = getopt(argc, argv, "hb:d:")) != -1) {
+	while ((c = getopt(argc, argv, "hb:d:t:")) != -1) {
 		switch (c) {
-			case 'b':
-				sscanf(optarg, "%d", &baudrate);
-				break;
-			case 'd':
-				sscanf(optarg, "%d", &delay);
-				break;
-			case 'h':
-				printf("Usage: %s [-b <BAUDRATE>] [-d <DELAY>] PORT\n", argv[0]);
-				printf("Saves time from a GPS receiver connected to PORT as local time.\n");
-				printf("Waits specified time until valid $GPRMC NMEA sentence is received. If no valid time information is received (i.e. the signal is poor), the local time remains unchanged.\n");
-				printf("This program has to be run with root privileges in order to configure local time.\n");
-				printf("\n");
-				printf("  -b BAUDRATE  Sets specified baudrate. Only limited baudrate set {2400, 4800, ..., 230400} is supported (Default %d bd).\n", baudrate);
-				printf("  -d DELAY     Sets the maximum time in seconds or -1 for infinite loop (Default %d s).\n", delay);
-				printf("  -h           Displays this help.\n");
-				printf("\n");
-				printf("(c) 2014 Adam Heinrich, www.adamheinrich.com\n");
-				return 0;
-				break;
-			case '?':
-				if (optopt == 'b' || optopt == 'd') {
-					fprintf(stderr, "Option -%c requires an argument.\nUse %s -h for help.\n", optopt, argv[0]);
-				} else {
-					fprintf(stderr, "Unknown option character '%c'.\nUse %s -h for help.\n", optopt, argv[0]);
-				}
-				return 1;
-			default:
-				fprintf(stderr, "Usage: %s [-b <BAUDRATE>] [-d <DELAY>] PORT_NAME\n", argv[0]);
-				return 1;
+		case 'b':
+			sscanf(optarg, "%d", &baudrate);
+			break;
+		case 't':
+		case 'd': /* For backward compatibility ("delay"): */
+			sscanf(optarg, "%d", &timeout);
+			break;
+		case 'h':
+			print_help(true, argv[0]);
+			return 0;
+		default:
+			print_help(false, argv[0]);
+			return 1;
 		}
 	}
 
-	/* Check for port name: */
+	/* Open port: */
 	if (optind < argc) {
 		port_name = argv[optind];
 	} else {
-		fprintf(stderr, "Port name must be specified.\nUse %s -h for help.\n", argv[0]);
+		print_help(false, argv[0]);
 		return 1;
 	}
 
-	/* Check baudrate: */
-	if (baudrate_constant(baudrate) == -1) {
-		fprintf(stderr, "Unsupported baudrate: %d.\nUse %s -h for help.\n", baudrate, argv[0]);
-		return 1;
-	}
-
-	/* Open port: */
-	int fd = open_port(port_name, baudrate);
+	int fd = serial_port_open(port_name, baudrate);
 	if (fd == -1) {
-		fprintf(stderr, "Can't open port %s\n", port_name);
+		fprintf(stderr, "Can't open port %s at %d baud\n",
+			port_name, baudrate);
 		return 1;
 	}
 
 	signal(SIGINT, &signal_handler);
 	signal(SIGTERM, &signal_handler);
 
-	int nread;
-	char buffer[32];
-	time_t first_time;
-	time_t curr_time;
-	time(&first_time);
+	time_t start_time, curr_time;
+	time(&start_time);
 
-	read_gps = 1;
+	char buffer[64];
 
 	while (read_gps) {
-		nread = read(fd, buffer, 32);
-		if (nread > 0) {
-			nmea_parse(nread, buffer, &message_complete);
+		time(&curr_time);
+		if (timeout > 0 && (curr_time - start_time) >= timeout) {
+			printf("No valid time information from GPS in the last "
+			       "%d seconds.\n", timeout);
+			break;
 		}
 
-		time(&curr_time);
-		if (read_gps && delay != -1 && (curr_time - first_time) >= delay) {
-			printf("No valid time information from GPS in last %d seconds.\n", delay);
-			read_gps = 0;
-		}
+		ssize_t nread = read(fd, buffer, sizeof(buffer));
+		if (nread > 0)
+			nmea_parse(buffer, (size_t)nread, &process_message);
+
+		usleep(100000);
 	}
 
 	close(fd);
 
-	return date_changed ? 0 : 1;
+	return date_changed ? 0 : 2;
 }

@@ -17,89 +17,97 @@
  * along with gpsdate.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "nmea.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "nmea.h"
+#include <stdbool.h>
 
-/* NMEA message argument values (array of strings). Argument 0 is the sentence
-   name (typically GPxxx), the last argument is message checksum (hexadecimal
-   number behind '*') */
-static char argv[32][32];
+#define ARRAY_SIZE(x)	(sizeof(x)/sizeof(*(x)))
 
-/* NMEA message argument count (incl. NMEA sentence name and checksum) */
-static int argc = 0;
+static char data[79 + 3 + 1]; /* '$' + 79 characters + CR + LF + '\0' */
+static size_t data_length;
 
-static int checksum = 0;
-static int calcchecksum = 0;
-static int argvbyte = 0;
+static const char *tokens[79 + 1]; /* 79 plus one always empty */
+static size_t tokens_length;
 
-static void clear(void)
+static int checksum;
+static bool checksum_process;
+
+static bool buffer_full;
+
+static void reset_parser(void)
 {
+	data[0] = '\0';
+	data_length = 0;
+
+	tokens[0] = data;
+	tokens_length = 0;
+
 	checksum = 0;
-	argc = 0;
-	argvbyte = 0;
-	calcchecksum = 0;
-	argv[argc][0] = '\0';
+	checksum_process = false;
+
+	buffer_full = false;
 }
 
-/**
- * Parses bytes from GPS receiver and fires listener action when the NMEA
- * sentence is complete and has valid checksum.
- *
- * The buffer size is arbitrary.
- *
- * @param numbytes	Number of bytes read in buffer
- * @param buffer	Buffer of incoming bytes
- * @param listener	Function to be fired after the sentence is parsed
- */
-void nmea_parse(int numbytes, char *buffer,
-		void (*nmea_parsed)(int argc, char argv[][32]))
+void nmea_parse(const char *buffer, size_t buffer_size,
+		void (*callback)(const char *msgid, const char **data))
 {
-	while (numbytes > 0 && *buffer) {
+	int n;
+	unsigned int val;
+
+	if (!buffer || !callback)
+		return;
+
+	while (buffer_size > 0 && *buffer) {
+		if (buffer_full && *buffer != '$')
+			continue;
+
 		switch (*buffer) {
-			case '$':
-				/* NMEA sentence start, calculate checksum: */
-				clear();
-				calcchecksum = 1;
+			case '$': /* NMEA sentence start */
+				reset_parser();
+				checksum_process = true;
 				break;
-			case '*':
-				/* Stop calculating checksum: */
-				calcchecksum = 0;
-				argc++;
-				argvbyte = 0;
-				argv[argc][0] = '\0';
-				break;
-			case '\n':
-				/* NMEA sentence end, validate checksum and
-				   fire listener: */
-				argc++;
-
-				int read_checksum = 0;
-				sscanf(argv[argc - 1], "%x", &read_checksum);
-
-				if (checksum == read_checksum) {
-					nmea_parsed(argc, argv);
+			case 10:
+			case 13: /* NMEA sentence end (CR/LF) */
+				if (data_length == 0 || tokens_length == 0) {
+					reset_parser();
+					break;
 				}
 
-				clear();
+				data[data_length++] = '\0';
+				n = sscanf(tokens[tokens_length], "%x", &val);
+
+				if (n == 1 && checksum == val) {
+					/* First token is MSGID,
+					   last  token is checksum: */
+					tokens[tokens_length] = NULL;
+					callback(tokens[0], &tokens[1]);
+				}
+
+				reset_parser();
 				break;
-			case ',':
-				/* Argument delimiter: */
-				argc++;
-				argvbyte = 0;
-				argv[argc][0] = '\0';
+			case '*': /* Checksum delimiter (fall through) */
+				checksum_process = false;
+			case ',': /* Data delimiter */
+				data[data_length++] = '\0';
+				tokens[++tokens_length] = &data[data_length];
+
+				if (data_length >= ARRAY_SIZE(data) ||
+				    tokens_length >= ARRAY_SIZE(tokens))
+					buffer_full = 1;
 				break;
 			default:
-				argv[argc][argvbyte++] = *buffer;
-				argv[argc][argvbyte] = '\0';
+				data[data_length++] = *buffer;
+				if (data_length >= ARRAY_SIZE(data))
+					buffer_full = true;
 				break;
 		}
 
-		if (calcchecksum && *buffer != '$') {
+		if (checksum_process && *buffer != '$') {
 			checksum ^= *buffer;
 		}
 
 		buffer++;
-		numbytes--;
+		buffer_size--;
 	}
 }

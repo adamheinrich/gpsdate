@@ -17,12 +17,9 @@
  * along with gpsdate.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef NMEA_H
-#define	NMEA_H
+#ifndef SERIAL_PORT_H
+#define SERIAL_PORT_H
 
-#include <stddef.h>
+int serial_port_open(const char *port_name, int baudrate);
 
-void nmea_parse(const char *buffer, size_t buffer_size,
-		void (*callback)(const char *msgid, const char **data));
-
-#endif	/* NMEA_H */
+#endif /* SERIAL_PORT_H */
